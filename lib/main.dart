@@ -1,3 +1,7 @@
+// ignore_for_file: prefer_const_constructors
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 void main() => runApp(MaterialApp(
@@ -12,32 +16,50 @@ class HomePage extends StatefulWidget {
 }
 
 class Task {
-  late String taskName; 
-  late int goalDuration;
-  late int currentDuration;
+  String taskName;
+  int goalDuration;
+  int currentDuration;
+  Timer? timer;
+  bool isRunning = false;
 
   Task(this.taskName, this.goalDuration, this.currentDuration);
 
-  updateTaskDuration(int duration){
+  void startTimer() {
+    if (!isRunning) {
+      isRunning = true;
+      timer = Timer.periodic(Duration(seconds: 1), (timer) {
+        currentDuration++;
+      });
+    }
+  }
+
+  void stopTimer() {
+    isRunning = false;
+    timer?.cancel();
+  }
+
+  void updateTaskDuration(int duration) {
     currentDuration += duration;
   }
 
-  int getTaskDuration(){
+  int getTaskDuration() {
     return currentDuration;
   }
 
-  int getGoalDuration(){
+  int getGoalDuration() {
     return goalDuration;
   }
 
-  String getTaskName(){
+  String getTaskName() {
     return taskName;
   }
-
 }
 
 class _HomePageState extends State<HomePage> {
   List<Task> task = [];
+  List<bool> expandedStates = [];
+  bool timeStarted = false;
+
   final TextEditingController _taskNameController = TextEditingController();
   final TextEditingController _taskDurationController = TextEditingController();
   final TextEditingController _taskCurrentController = TextEditingController();
@@ -67,11 +89,11 @@ class _HomePageState extends State<HomePage> {
                       ),
                       TextField(
                         controller: _taskDurationController,
-                        decoration: InputDecoration(hintText: 'Enter Goal Length (sec)')
+                        decoration: InputDecoration(hintText: 'Enter Goal Length')
                       ),
                       TextField(
                         controller: _taskCurrentController,
-                        decoration: InputDecoration(hintText: 'Enter Current Lenght (sec)')
+                        decoration: InputDecoration(hintText: 'Enter Current Length')
                       ),
                     ]
                 ),
@@ -91,6 +113,7 @@ class _HomePageState extends State<HomePage> {
                           int.parse(_taskDurationController.text), 
                           int.parse(_taskCurrentController.text)
                         );
+                        expandedStates.add(false);
                         task.add(newTask);
                       });
                       Navigator.of(context).pop();
@@ -112,9 +135,13 @@ class _HomePageState extends State<HomePage> {
         child: ListView.builder(
           itemCount: task.length,
           itemBuilder: (BuildContext context, int index) {
-              return Container(
+              return AnimatedContainer(
                   margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                  height: 100,
+                  duration: Duration(milliseconds: 400), // 400 is smoothest 
+                  curve: Curves.ease,
+                  height: expandedStates[index] ? 200 : 100,
+                  alignment: AlignmentDirectional.topStart,
+                  clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     color: Colors.white,
@@ -130,9 +157,11 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: (){
-                        
+                        setState(() {
+                          expandedStates[index] = !expandedStates[index];
+                        });
                       },
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: expandedStates[index] ? BorderRadius.circular(0) : BorderRadius.circular(20),
                       child: Column(
                         children: <Widget>[
                           Padding(
@@ -154,8 +183,18 @@ class _HomePageState extends State<HomePage> {
                           OverflowBar(
                             alignment: MainAxisAlignment.spaceEvenly,
                             children: <Widget>[
-                              TextButton( child: const Text('Start Time'), onPressed: () {}),
-                              TextButton( child: const Text('Stop Time'), onPressed: () {}),
+                              TextButton( 
+                                child: const Text('Start Time'), 
+                                onPressed: () {
+                                  task[index].startTimer();
+                                }
+                              ),
+                              TextButton(
+                                child: const Text('Stop Time'), 
+                                onPressed: () {
+                                  task[index].stopTimer();
+                                }
+                              ),
                               TextButton( 
                                 child: const Text('Delete Task', selectionColor: Colors.red), 
                                 onPressed:() {
@@ -169,6 +208,7 @@ class _HomePageState extends State<HomePage> {
                                             onPressed: (){
                                               setState((){
                                                 task.removeAt(index);
+                                                expandedStates.removeAt(index);
                                               });
                                               Navigator.of(context).pop();
                                             }, 
@@ -184,7 +224,45 @@ class _HomePageState extends State<HomePage> {
                                   );
                                 }),
                             ],
-                          )
+                          ),
+                          if (expandedStates[index])
+                            Expanded( //TODO: Fix overflow for text
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  Center(
+                                    child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: <Widget>[
+                                      Text('Goal Duration   ', 
+                                        style: TextStyle(
+                                          color: Colors.deepPurple, 
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 20),
+                                        ),
+                                      Text('${task[index].goalDuration}', 
+                                        style: TextStyle(color: Colors.deepPurple, fontSize: 20)
+                                        ),
+                                    ]
+                                    ),
+                                  ),
+                                  Center(
+                                    child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: <Widget>[
+                                      Text('Current Duration    ', 
+                                        style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold,fontSize: 20),
+                                      ),
+                                     Text('${task[index].currentDuration}', 
+                                        style: TextStyle(color: Colors.deepPurple, fontSize: 20),
+                                      ),
+                                    ]
+                                    ),
+                                  ),
+                                ]
+                              )
+                            )
                         ]
                       )
                     )
