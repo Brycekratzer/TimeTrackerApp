@@ -1,8 +1,10 @@
 // ignore_for_file: prefer_const_constructors
 
-import 'dart:async';
+// TODO: allow Current Duration to be specific to Minute, Hour, Second.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 void main() => runApp(MaterialApp(
   home: HomePage(),
@@ -18,18 +20,64 @@ class HomePage extends StatefulWidget {
 class Task {
   String taskName;
   int goalDuration;
+  int goalDurationBar = 0;
   int currentDuration;
   Timer? timer;
+  int secondVal = 0;
+  int minuteVal = 0;
   bool isRunning = false;
+  String timeUnit = 'seconds';
+  final StreamController<int> _durationController = StreamController<int>.broadcast();
 
-  Task(this.taskName, this.goalDuration, this.currentDuration);
+  Stream<int> get durationStream => _durationController.stream;
+
+
+  Task(this.taskName, this.goalDuration, this.currentDuration, this.timeUnit){
+    print(timeUnit);
+    if(timeUnit == 'Minutes'){
+      goalDurationBar = goalDuration * 60;
+    } else if (timeUnit == 'Hours'){
+      goalDurationBar = goalDuration * 3600;
+    } else {
+      goalDurationBar = goalDuration;
+    }
+  }
 
   void startTimer() {
     if (!isRunning) {
       isRunning = true;
-      timer = Timer.periodic(Duration(seconds: 1), (timer) {
-        currentDuration++;
-      });
+      //if(timeUnit == 'Seconds'){
+        timer = Timer.periodic(Duration(seconds: 1), (timer) {
+          if(currentDuration < goalDurationBar){
+            currentDuration++;
+            _durationController.add(currentDuration);
+          } else {
+            timer.cancel();
+          }
+        });
+      // } else if(timeUnit == 'Minutes'){
+      //   timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      //     if((secondVal % 60 == 0) && (secondVal != 0)){
+      //       minuteVal++;
+      //       _durationControllerMin.add(minuteVal);
+      //     }
+      //     if(secondVal < goalDurationBar){
+      //       secondVal++;
+      //       _durationController.add(secondVal);
+      //     } else {
+      //       timer.cancel();
+      //     }
+      //   });
+      // } else if(timeUnit == 'Hours'){
+      //   timer = Timer.periodic(Duration(hours: 1), (timer) {
+      //     if(currentDuration < goalDuration){
+      //       currentDuration++;
+      //       _durationController.add(currentDuration);
+      //     } else {
+      //       timer.cancel();
+      //     }
+      //   });
+      //}
     }
   }
 
@@ -40,6 +88,7 @@ class Task {
 
   void updateTaskDuration(int duration) {
     currentDuration += duration;
+    _durationController.add(currentDuration);
   }
 
   int getTaskDuration() {
@@ -59,10 +108,13 @@ class _HomePageState extends State<HomePage> {
   List<Task> task = [];
   List<bool> expandedStates = [];
   bool timeStarted = false;
+  List<DropdownMenuEntry<String>> timeUnits =[DropdownMenuEntry(value: 'seconds', label: 'Seconds'), DropdownMenuEntry(value: 'minutes', label: 'Minutes'), DropdownMenuEntry(value: 'hours', label: 'Hours')];
+  String dropdownSelection = 'seconds'; 
 
   final TextEditingController _taskNameController = TextEditingController();
   final TextEditingController _taskDurationController = TextEditingController();
   final TextEditingController _taskCurrentController = TextEditingController();
+  final TextEditingController _taskTimeUnitsController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -79,9 +131,11 @@ class _HomePageState extends State<HomePage> {
             context: context, 
             builder: (BuildContext context) {
               return AlertDialog(
+                shadowColor: Colors.deepPurple.withOpacity(1),
+                insetPadding: EdgeInsets.symmetric(vertical: 150),
                 title: Text('New Task'),
                 content: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.start,
                     children: <Widget>[
                       TextField(
                         controller: _taskNameController,
@@ -94,6 +148,15 @@ class _HomePageState extends State<HomePage> {
                       TextField(
                         controller: _taskCurrentController,
                         decoration: InputDecoration(hintText: 'Enter Current Length')
+                      ),
+                      SizedBox(height: 20),
+                      DropdownMenu(
+                        menuHeight: 100,
+                        dropdownMenuEntries: timeUnits,
+                        controller: _taskTimeUnitsController,
+                        hintText: 'Time Units',
+                        enableSearch: false,
+                        initialSelection: 'Seconds',
                       ),
                     ]
                 ),
@@ -111,7 +174,8 @@ class _HomePageState extends State<HomePage> {
                         Task newTask = Task(
                           _taskNameController.text, 
                           int.parse(_taskDurationController.text), 
-                          int.parse(_taskCurrentController.text)
+                          int.parse(_taskCurrentController.text),
+                          _taskTimeUnitsController.text
                         );
                         expandedStates.add(false);
                         task.add(newTask);
@@ -173,11 +237,17 @@ class _HomePageState extends State<HomePage> {
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 70),
-                            child: LinearProgressIndicator(
-                                value: (task[index].currentDuration / task[index].goalDuration),
-                                backgroundColor: const Color.fromARGB(255, 218, 218, 218),
-                                valueColor: AlwaysStoppedAnimation<Color>(const Color.fromARGB(255, 116, 10, 134)),
-                                borderRadius: BorderRadius.circular(30),
+                            child: StreamBuilder<int>(
+                              stream: task[index].durationStream,
+                              initialData: task[index].currentDuration,
+                              builder: (context, snapshot){
+                                return  LinearProgressIndicator(
+                                  value: snapshot.hasData ? (snapshot.data! / task[index].goalDurationBar) : 0.0,
+                                  backgroundColor: const Color.fromARGB(255, 218, 218, 218),
+                                  valueColor: AlwaysStoppedAnimation<Color>(const Color.fromARGB(255, 116, 10, 134)),
+                                  borderRadius: BorderRadius.circular(30),
+                                );
+                              }
                             )
                           ),
                           OverflowBar(
@@ -226,38 +296,49 @@ class _HomePageState extends State<HomePage> {
                             ],
                           ),
                           if (expandedStates[index])
-                            Expanded( //TODO: Fix overflow for text
+                            Expanded(
                               child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: <Widget>[
                                   Center(
                                     child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: <Widget>[
-                                      Text('Goal Duration   ', 
-                                        style: TextStyle(
-                                          color: Colors.deepPurple, 
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 20),
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: <Widget>[
+                                        Text('Current Duration: ', 
+                                          style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold,fontSize: 20),
                                         ),
-                                      Text('${task[index].goalDuration}', 
-                                        style: TextStyle(color: Colors.deepPurple, fontSize: 20)
+                                        StreamBuilder<int>(
+                                          stream: task[index].durationStream,
+                                          initialData: task[index].currentDuration,
+                                          builder: (context, snapshot) {
+                                            String unit = task[index].timeUnit;
+                                            int value = snapshot.data ?? 0;
+                                            
+                                            if (unit == 'Minutes') {
+                                              value = (value / 60).floor();
+                                            } else if (unit == 'Hours') {
+                                              value = (value / 3600).floor();
+                                            }
+                                            
+                                            return Text(
+                                              '$value ${task[index].timeUnit}',
+                                              style: TextStyle(color: Colors.deepPurple, fontSize: 20),
+                                            );
+                                          },
                                         ),
-                                    ]
+                                      ]
                                     ),
                                   ),
                                   Center(
                                     child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: <Widget>[
-                                      Text('Current Duration    ', 
-                                        style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold,fontSize: 20),
-                                      ),
-                                     Text('${task[index].currentDuration}', 
-                                        style: TextStyle(color: Colors.deepPurple, fontSize: 20),
-                                      ),
-                                    ]
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: <Widget>[
+                                        Text('Goal Duration: ', 
+                                          style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold,fontSize: 15),
+                                        ),
+                                        Text('${task[index].goalDuration} ${task[index].timeUnit}', style: TextStyle(color: Colors.deepPurple,fontSize: 15))
+                                      ]
                                     ),
                                   ),
                                 ]
