@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 void main() => runApp(MaterialApp(
   home: HomePage(),
@@ -289,11 +290,21 @@ class _HomePageState extends State<HomePage> {
                               stream: task[index].durationStream,
                               initialData: task[index].currentDuration,
                               builder: (context, snapshot){
-                                return  LinearProgressIndicator(
-                                  value: snapshot.hasData ? (snapshot.data! / task[index].goalDurationBar) : 0.0,
-                                  backgroundColor: const Color.fromARGB(255, 218, 218, 218),
-                                  valueColor: AlwaysStoppedAnimation<Color>(const Color.fromARGB(255, 116, 10, 134)),
-                                  borderRadius: BorderRadius.circular(30),
+                                return TweenAnimationBuilder<double>(
+                                  duration: const Duration(seconds: 1),
+                                  curve: Curves.linear,
+                                  tween: Tween<double>(
+                                    begin: 0,
+                                    end: snapshot.hasData ? (snapshot.data! / task[index].goalDurationBar) : 0.0,
+                                  ),
+                                  builder: (context, value, child) {
+                                    return LinearProgressIndicator(
+                                      value: value,
+                                      backgroundColor: const Color.fromARGB(255, 218, 218, 218),
+                                      valueColor: const AlwaysStoppedAnimation<Color>(Color.fromARGB(255, 116, 10, 134)),
+                                      borderRadius: BorderRadius.circular(30),
+                                    );
+                                  },
                                 );
                               }
                             )
