@@ -35,8 +35,10 @@ class Task {
   Task(this.taskName, this.goalDuration, this.currentDuration, this.timeUnit){
     if(timeUnit == 'Minutes'){
       goalDurationBar = goalDuration * 60;
+      currentDuration *= 60;
     } else if (timeUnit == 'Hours'){
       goalDurationBar = goalDuration * 3600;
+      currentDuration *= 3600;
     } else {
       goalDurationBar = goalDuration;
     }
@@ -45,7 +47,6 @@ class Task {
   void startTimer() {
     if (!isRunning) {
       isRunning = true;
-      //if(timeUnit == 'Seconds'){
         timer = Timer.periodic(Duration(seconds: 1), (timer) {
           if(currentDuration < goalDurationBar){
             currentDuration++;
@@ -54,29 +55,6 @@ class Task {
             timer.cancel();
           }
         });
-      // } else if(timeUnit == 'Minutes'){
-      //   timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      //     if((secondVal % 60 == 0) && (secondVal != 0)){
-      //       minuteVal++;
-      //       _durationControllerMin.add(minuteVal);
-      //     }
-      //     if(secondVal < goalDurationBar){
-      //       secondVal++;
-      //       _durationController.add(secondVal);
-      //     } else {
-      //       timer.cancel();
-      //     }
-      //   });
-      // } else if(timeUnit == 'Hours'){
-      //   timer = Timer.periodic(Duration(hours: 1), (timer) {
-      //     if(currentDuration < goalDuration){
-      //       currentDuration++;
-      //       _durationController.add(currentDuration);
-      //     } else {
-      //       timer.cancel();
-      //     }
-      //   });
-      //}
     }
   }
 
@@ -86,8 +64,19 @@ class Task {
   }
 
   void updateTaskDuration(int duration) {
-    currentDuration += duration;
-    _durationController.add(currentDuration);
+    if(timeUnit == 'Minutes'){
+      duration *= 60;
+    } else if (timeUnit == 'Hours'){
+      duration *= duration * 3600;
+    }
+
+    if((currentDuration + duration) >= goalDurationBar){
+      currentDuration = goalDurationBar;
+      _durationController.add(((goalDurationBar - currentDuration) + currentDuration));
+    } else {
+      currentDuration += duration;
+      _durationController.add(currentDuration);
+    }
   }
 
   int getTaskDuration() {
@@ -106,7 +95,7 @@ class Task {
 class _HomePageState extends State<HomePage> {
   List<Task> task = [];
   List<bool> expandedStates = [];
-  bool timeStarted = false;
+  List<bool> isRunning = [];
   List<DropdownMenuEntry<String>> timeUnits =[DropdownMenuEntry(value: 'seconds', label: 'Seconds'), DropdownMenuEntry(value: 'minutes', label: 'Minutes'), DropdownMenuEntry(value: 'hours', label: 'Hours')];
   String dropdownSelection = 'seconds'; 
 
@@ -114,6 +103,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _taskDurationController = TextEditingController();
   final TextEditingController _taskCurrentController = TextEditingController();
   final TextEditingController _taskTimeUnitsController = TextEditingController();
+  final TextEditingController _taskAddDurationController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +167,7 @@ class _HomePageState extends State<HomePage> {
                           _taskTimeUnitsController.text
                         );
                         expandedStates.add(false);
+                        isRunning.add(false);
                         task.add(newTask);
                       });
                       Navigator.of(context).pop();
@@ -254,12 +245,14 @@ class _HomePageState extends State<HomePage> {
                                 child: const Text('Start Time'), 
                                 onPressed: () {
                                   task[index].startTimer();
+                                  isRunning[index] = true;
                                 }
                               ),
                               TextButton(
                                 child: const Text('Stop Time'), 
                                 onPressed: () {
                                   task[index].stopTimer();
+                                  isRunning[index] = false;
                                 }
                               ),
                               TextButton( 
@@ -276,6 +269,7 @@ class _HomePageState extends State<HomePage> {
                                               setState((){
                                                 task.removeAt(index);
                                                 expandedStates.removeAt(index);
+                                                isRunning.removeAt(index);
                                               });
                                               Navigator.of(context).pop();
                                             }, 
@@ -346,9 +340,49 @@ class _HomePageState extends State<HomePage> {
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           TextButton(
-                                            onPressed: (){}, 
+                                            onPressed: (){
+                                              showDialog(
+                                                context: context, 
+                                                builder: (BuildContext context){
+                                                  return AlertDialog(
+                                                    shadowColor: Colors.deepPurple.withOpacity(1),
+                                                    insetPadding: EdgeInsets.symmetric(vertical: 270),
+                                                    title: Text('Add Time in ${task[index].timeUnit}'),
+                                                    content: Column(
+                                                        mainAxisAlignment: MainAxisAlignment.start,
+                                                        children: <Widget>[
+                                                          TextField(
+                                                            controller: _taskAddDurationController,
+                                                            decoration: InputDecoration(hintText: 'Enter Amount (${task[index].timeUnit})')
+                                                          ),
+                                                        ]
+                                                    ),
+                                                    actions: <Widget>[
+                                                      TextButton(
+                                                        child: Text('Cancel'),
+                                                        onPressed: () {
+                                                          Navigator.of(context).pop();
+                                                        },
+                                                      ),
+                                                      TextButton(
+                                                        child: Text('Add'),
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            int amountDuration = int.parse(_taskAddDurationController.text);
+                                                            expandedStates.add(false);
+                                                            task[index].updateTaskDuration(amountDuration);
+                                                          });
+                                                          Navigator.of(context).pop();
+                                                        },
+                                                      ),
+                                                    ],
+                                                  );
+                                                }
+                                              );
+                                            }, 
                                             child: Text('Add Time', selectionColor: Colors.deepPurpleAccent,)
-                                          )
+                                          ),
+                                          //TODO add a feature that shows user when time is playing
                                         ],
                                       ),
                                     )
