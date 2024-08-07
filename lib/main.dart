@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 void main() => runApp(MaterialApp(
   home: HomePage(),
@@ -28,8 +29,10 @@ class Task {
   bool isRunning = false;
   String timeUnit = 'seconds';
   final StreamController<int> _durationController = StreamController<int>.broadcast();
+  final StreamController<bool> _runningController = StreamController<bool>.broadcast();
 
   Stream<int> get durationStream => _durationController.stream;
+  Stream<bool> get runnningStream => _runningController.stream;
 
 
   Task(this.taskName, this.goalDuration, this.currentDuration, this.timeUnit){
@@ -47,6 +50,7 @@ class Task {
   void startTimer() {
     if (!isRunning) {
       isRunning = true;
+      _runningController.add(true);
         timer = Timer.periodic(Duration(seconds: 1), (timer) {
           if(currentDuration < goalDurationBar){
             currentDuration++;
@@ -60,6 +64,7 @@ class Task {
 
   void stopTimer() {
     isRunning = false;
+    _runningController.add(false);
     timer?.cancel();
   }
 
@@ -95,7 +100,6 @@ class Task {
 class _HomePageState extends State<HomePage> {
   List<Task> task = [];
   List<bool> expandedStates = [];
-  List<bool> isRunning = [];
   List<DropdownMenuEntry<String>> timeUnits =[DropdownMenuEntry(value: 'seconds', label: 'Seconds'), DropdownMenuEntry(value: 'minutes', label: 'Minutes'), DropdownMenuEntry(value: 'hours', label: 'Hours')];
   String dropdownSelection = 'seconds'; 
 
@@ -121,20 +125,27 @@ class _HomePageState extends State<HomePage> {
             builder: (BuildContext context) {
               return AlertDialog(
                 shadowColor: Colors.deepPurple.withOpacity(1),
-                insetPadding: EdgeInsets.symmetric(vertical: 150),
+                insetPadding: EdgeInsets.symmetric(vertical: 120),
                 title: Text('New Task'),
                 content: Column(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: <Widget>[
                       TextField(
+                        maxLength: 30,
                         controller: _taskNameController,
                         decoration: InputDecoration(hintText: 'Enter Task Name')
                       ),
                       TextField(
+                        maxLength: 10,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        keyboardType: TextInputType.number,
                         controller: _taskDurationController,
                         decoration: InputDecoration(hintText: 'Enter Goal Length')
                       ),
                       TextField(
+                        keyboardType: TextInputType.number,
+                        maxLength: 10,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         controller: _taskCurrentController,
                         decoration: InputDecoration(hintText: 'Enter Current Length')
                       ),
@@ -167,7 +178,6 @@ class _HomePageState extends State<HomePage> {
                           _taskTimeUnitsController.text
                         );
                         expandedStates.add(false);
-                        isRunning.add(false);
                         task.add(newTask);
                       });
                       Navigator.of(context).pop();
@@ -186,14 +196,28 @@ class _HomePageState extends State<HomePage> {
       body: AnimatedContainer(
         padding: EdgeInsets.symmetric(vertical: 5),
         duration: Duration(seconds: 2),
-        child: ListView.builder(
+        child: ReorderableListView.builder(
+          onReorder: (oldIndex, newIndex) {
+            setState(() {
+              if (oldIndex < newIndex) {
+                newIndex -= 1;
+              }
+              final Task movedTask = task.removeAt(oldIndex);
+              task.insert(newIndex, movedTask);
+
+              final bool movedExpandState = expandedStates.removeAt(oldIndex);
+              expandedStates.insert(newIndex, movedExpandState);
+            });
+          },
+          proxyDecorator: (child, index, animation) {return child;},
           itemCount: task.length,
           itemBuilder: (BuildContext context, int index) {
               return AnimatedContainer(
+                  key: ValueKey(task[index]),
                   margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                   duration: Duration(milliseconds: 400), // 400 is smoothest 
                   curve: Curves.ease,
-                  height: expandedStates[index] ? 200 : 100,
+                  height: expandedStates[index] ? 220 : 120,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     color: Colors.white,
@@ -218,10 +242,27 @@ class _HomePageState extends State<HomePage> {
                         children: <Widget>[
                           Padding(
                             padding: const EdgeInsets.all(9),
-                            child: Text(
-                                    task[index].taskName,
-                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
-                                  )
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  children: [
+                                    StreamBuilder<bool>(
+                                      stream: task[index].runnningStream,
+                                      initialData: task[index].isRunning,
+                                      builder: (context, snapshot) {
+                                        bool isRunning = snapshot.data ?? false;
+                                        return Icon(isRunning == true ? Icons.timer_outlined : Icons.timer_off_outlined, size: 20, color: Colors.deepPurpleAccent,);
+                                      }
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                        task[index].taskName,
+                                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                                      ),
+                              ],
+                            )
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 70),
@@ -245,14 +286,12 @@ class _HomePageState extends State<HomePage> {
                                 child: const Text('Start Time'), 
                                 onPressed: () {
                                   task[index].startTimer();
-                                  isRunning[index] = true;
                                 }
                               ),
                               TextButton(
                                 child: const Text('Stop Time'), 
                                 onPressed: () {
                                   task[index].stopTimer();
-                                  isRunning[index] = false;
                                 }
                               ),
                               TextButton( 
@@ -269,7 +308,6 @@ class _HomePageState extends State<HomePage> {
                                               setState((){
                                                 task.removeAt(index);
                                                 expandedStates.removeAt(index);
-                                                isRunning.removeAt(index);
                                               });
                                               Navigator.of(context).pop();
                                             }, 
@@ -346,12 +384,14 @@ class _HomePageState extends State<HomePage> {
                                                 builder: (BuildContext context){
                                                   return AlertDialog(
                                                     shadowColor: Colors.deepPurple.withOpacity(1),
-                                                    insetPadding: EdgeInsets.symmetric(vertical: 270),
+                                                    insetPadding: EdgeInsets.symmetric(vertical: 255),
                                                     title: Text('Add Time in ${task[index].timeUnit}'),
                                                     content: Column(
                                                         mainAxisAlignment: MainAxisAlignment.start,
                                                         children: <Widget>[
                                                           TextField(
+                                                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                            maxLength: 30,
                                                             controller: _taskAddDurationController,
                                                             decoration: InputDecoration(hintText: 'Enter Amount (${task[index].timeUnit})')
                                                           ),
@@ -382,7 +422,6 @@ class _HomePageState extends State<HomePage> {
                                             }, 
                                             child: Text('Add Time', selectionColor: Colors.deepPurpleAccent,)
                                           ),
-                                          //TODO add a feature that shows user when time is playing
                                         ],
                                       ),
                                     )
