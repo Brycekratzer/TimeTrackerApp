@@ -33,7 +33,6 @@ class Task {
 
 
   Task(this.taskName, this.goalDuration, this.currentDuration, this.timeUnit){
-    print(timeUnit);
     if(timeUnit == 'Minutes'){
       goalDurationBar = goalDuration * 60;
     } else if (timeUnit == 'Hours'){
@@ -204,8 +203,6 @@ class _HomePageState extends State<HomePage> {
                   duration: Duration(milliseconds: 400), // 400 is smoothest 
                   curve: Curves.ease,
                   height: expandedStates[index] ? 200 : 100,
-                  alignment: AlignmentDirectional.topStart,
-                  clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     color: Colors.white,
@@ -297,51 +294,66 @@ class _HomePageState extends State<HomePage> {
                           ),
                           if (expandedStates[index])
                             Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  Center(
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: <Widget>[
-                                        Text('Current Duration: ', 
-                                          style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold,fontSize: 20),
-                                        ),
-                                        StreamBuilder<int>(
-                                          stream: task[index].durationStream,
-                                          initialData: task[index].currentDuration,
-                                          builder: (context, snapshot) {
-                                            String unit = task[index].timeUnit;
-                                            int value = snapshot.data ?? 0;
-                                            
-                                            if (unit == 'Minutes') {
-                                              value = (value / 60).floor();
-                                            } else if (unit == 'Hours') {
-                                              value = (value / 3600).floor();
-                                            }
-                                            
-                                            return Text(
-                                              '$value ${task[index].timeUnit}',
-                                              style: TextStyle(color: Colors.deepPurple, fontSize: 20),
-                                            );
-                                          },
-                                        ),
-                                      ]
+                              child: UnconstrainedBox(
+                                alignment: Alignment.topCenter,
+                                clipBehavior: Clip.hardEdge,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    Center(
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: <Widget>[
+                                          Text('Current Duration: ', 
+                                            style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold,fontSize: 20),
+                                          ),
+                                          StreamBuilder<int>(
+                                            stream: task[index].durationStream,
+                                            initialData: task[index].currentDuration,
+                                            builder: (context, snapshot) {
+                                              String unit = task[index].timeUnit;
+                                              int value = snapshot.data ?? 0;
+                                              
+                                              if (unit == 'Minutes') {
+                                                value = (value / 60).floor();
+                                              } else if (unit == 'Hours') {
+                                                value = (value / 3600).floor();
+                                              }
+                                              
+                                              return Text(
+                                                '$value ${task[index].timeUnit}',
+                                                style: TextStyle(color: Colors.deepPurple, fontSize: 20),
+                                              );
+                                            },
+                                          ),
+                                        ]
+                                      ),
                                     ),
-                                  ),
-                                  Center(
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: <Widget>[
-                                        Text('Goal Duration: ', 
-                                          style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold,fontSize: 15),
-                                        ),
-                                        Text('${task[index].goalDuration} ${task[index].timeUnit}', style: TextStyle(color: Colors.deepPurple,fontSize: 15))
-                                      ]
+                                    Center(
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: <Widget>[
+                                          Text('Goal Duration: ', 
+                                            style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold,fontSize: 15),
+                                          ),
+                                          Text('${task[index].goalDuration} ${task[index].timeUnit}', style: TextStyle(color: Colors.deepPurple,fontSize: 15))
+                                        ]
+                                      ),
                                     ),
-                                  ),
-                                ]
+                                    Center(
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          TextButton(
+                                            onPressed: (){}, 
+                                            child: Text('Add Time', selectionColor: Colors.deepPurpleAccent,)
+                                          )
+                                        ],
+                                      ),
+                                    )
+                                  ]
+                                ),
                               )
                             )
                         ]
