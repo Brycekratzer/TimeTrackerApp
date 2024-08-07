@@ -30,9 +30,11 @@ class Task {
   String timeUnit = 'seconds';
   final StreamController<int> _durationController = StreamController<int>.broadcast();
   final StreamController<bool> _runningController = StreamController<bool>.broadcast();
+  final StreamController<bool> _completedController = StreamController<bool>.broadcast();
 
   Stream<int> get durationStream => _durationController.stream;
   Stream<bool> get runnningStream => _runningController.stream;
+  Stream<bool> get completedStream => _completedController.stream;
 
 
   Task(this.taskName, this.goalDuration, this.currentDuration, this.timeUnit){
@@ -57,6 +59,7 @@ class Task {
             _durationController.add(currentDuration);
           } else {
             timer.cancel();
+            _completedController.add(true);
           }
         });
     }
@@ -78,6 +81,7 @@ class Task {
     if((currentDuration + duration) >= goalDurationBar){
       currentDuration = goalDurationBar;
       _durationController.add(((goalDurationBar - currentDuration) + currentDuration));
+      _completedController.add(true);
     } else {
       currentDuration += duration;
       _durationController.add(currentDuration);
@@ -108,6 +112,15 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _taskCurrentController = TextEditingController();
   final TextEditingController _taskTimeUnitsController = TextEditingController();
   final TextEditingController _taskAddDurationController = TextEditingController();
+
+  void _moveTaskToEnd(int index) {
+    setState(() {
+      Task completedTask = task.removeAt(index);
+      bool expandedState = expandedStates.removeAt(index);
+      task.add(completedTask);
+      expandedStates.add(expandedState);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +190,12 @@ class _HomePageState extends State<HomePage> {
                           int.parse(_taskCurrentController.text),
                           _taskTimeUnitsController.text
                         );
+                        newTask.completedStream.listen((completed) {
+                          if (completed) {
+                            int index = task.indexOf(newTask);
+                            _moveTaskToEnd(index);
+                          }
+                        });
                         expandedStates.add(false);
                         task.add(newTask);
                       });
@@ -438,6 +457,18 @@ class _HomePageState extends State<HomePage> {
         )
       )
     );
+  }
+  @override
+  void initState() {
+    super.initState();
+    for (var onetask in task) {
+      onetask.completedStream.listen((completed) {
+        if (completed) {
+          int index = task.indexOf(onetask);
+          _moveTaskToEnd(index);
+        }
+      });
+    }
   }
 }
 
